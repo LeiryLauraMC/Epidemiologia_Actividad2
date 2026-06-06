@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Predicción de Conductas Suicidas – UK Biobank</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --cream: #F7F3EE;
+    --warm-white: #FDFAF6;
+    --slate: #2C3E50;
+    --teal: #1A6B72;
+    --teal-light: #2A9BA5;
+    --teal-pale: #D4EEF0;
+    --gold: #C9943A;
+    --gold-light: #E8C97A;
+    --rose: #B85C5C;
+    --text-dark: #1E2A30;
+    --text-mid: #4A5568;
+    --text-light: #718096;
+    --border: #D8CFC4;
+  }
+
+  html, body { width:100%; height:100%; font-family:'DM Sans',sans-serif; background:#1A2030; overflow:hidden; }
+  .deck { width:100vw; height:100vh; position:relative; overflow:hidden; }
+
+  /* SLIDE BASE */
+  .slide { position:absolute; inset:0; display:none; flex-direction:column; background:var(--cream); overflow:hidden; }
+  .slide.active { display:flex; }
+
+  /* decorative gradients */
+  .slide::before {
+    content:''; position:absolute; top:0; left:0; width:300px; height:300px;
+    background:radial-gradient(circle at top left, var(--teal-pale) 0%, transparent 70%);
+    pointer-events:none; z-index:0;
+  }
+  .slide::after {
+    content:''; position:absolute; bottom:0; right:0; width:220px; height:220px;
+    background:radial-gradient(circle at bottom right, rgba(201,148,58,0.12) 0%, transparent 70%);
+    pointer-events:none; z-index:0;
+  }
+
+  /* HEADER */
+  .slide-header {
+    position:relative; z-index:2;
+    padding:16px 52px 12px;
+    border-bottom:1.5px solid var(--border);
+    display:flex; align-items:center; gap:16px;
+    background:var(--warm-white);
+    flex-shrink:0;
+  }
+  .slide-header .num { font-family:'Playfair Display',serif; font-size:13px; color:var(--teal); font-weight:700; letter-spacing:2px; text-transform:uppercase; white-space:nowrap; }
+  .slide-header .bar-line { height:1px; flex:1; background:linear-gradient(90deg, var(--teal-light), transparent); }
+  .slide-header .tag { font-size:11px; color:var(--text-light); letter-spacing:1.5px; text-transform:uppercase; }
+
+  /* BODY */
+  .slide-body { position:relative; z-index:2; flex:1; padding:24px 52px 18px; display:flex; flex-direction:column; overflow:hidden; }
+
+  /* TYPOGRAPHY */
+  h2.section-title {
+    font-family:'Playfair Display',serif; font-size:1.55rem; color:var(--slate);
+    margin-bottom:16px; border-left:4px solid var(--teal); padding-left:14px; line-height:1.2; flex-shrink:0;
+  }
+
+  /* CARDS */
+  .card-grid { display:grid; gap:12px; flex:1; }
+  .card-grid.cols-2 { grid-template-columns:1fr 1fr; }
+  .card-grid.cols-3 { grid-template-columns:1fr 1fr 1fr; }
+  .card-grid.cols-4 { grid-template-columns:1fr 1fr 1fr 1fr; }
+
+  .card {
+    background:white; border-radius:10px; padding:16px 18px;
+    border:1px solid var(--border); box-shadow:0 2px 8px rgba(0,0,0,0.06);
+    display:flex; flex-direction:column; gap:7px;
+  }
+  .card.accent-teal { border-left:4px solid var(--teal); }
+  .card.accent-gold  { border-left:4px solid var(--gold); }
+  .card.accent-rose  { border-left:4px solid var(--rose); }
+  .card.accent-slate { border-left:4px solid var(--slate); }
+
+  .card-label { font-size:0.68rem; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-light); }
+  .card-value { font-family:'Playfair Display',serif; font-size:1.4rem; color:var(--text-dark); line-height:1.1; }
+  .card-value.large { font-size:2rem; color:var(--teal); }
+  .card-desc { font-size:0.81rem; color:var(--text-mid); line-height:1.5; }
+
+  /* BULLET LIST */
+  .bullet-list { list-style:none; display:flex; flex-direction:column; gap:9px; }
+  .bullet-list li { display:flex; align-items:flex-start; gap:10px; font-size:0.88rem; color:var(--text-mid); line-height:1.45; }
+  .bullet-list li::before { content:''; width:7px; height:7px; border-radius:50%; background:var(--teal-light); flex-shrink:0; margin-top:5px; }
+  .bullet-list li strong { color:var(--text-dark); }
+
+  /* TWO-COL */
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:20px; flex:1; }
+  .col { display:flex; flex-direction:column; gap:10px; }
+
+  /* HIGHLIGHT BOX */
+  .highlight-box { background:linear-gradient(135deg, var(--teal) 0%, var(--teal-light) 100%); border-radius:12px; padding:18px 22px; color:white; }
+  .highlight-box .hb-label { font-size:0.68rem; letter-spacing:2px; text-transform:uppercase; opacity:0.75; margin-bottom:5px; }
+  .highlight-box .hb-value { font-family:'Playfair Display',serif; font-size:1.6rem; line-height:1.1; margin-bottom:4px; }
+  .highlight-box .hb-desc { font-size:0.8rem; opacity:0.85; line-height:1.45; }
+
+  /* TABLE */
+  .styled-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+  .styled-table thead tr { background:var(--teal); color:white; }
+  .styled-table thead th { padding:9px 13px; text-align:left; font-weight:500; letter-spacing:0.4px; }
+  .styled-table tbody tr:nth-child(even) { background:var(--teal-pale); }
+  .styled-table tbody tr:nth-child(odd) { background:white; }
+  .styled-table td { padding:8px 13px; color:var(--text-mid); border-bottom:1px solid var(--border); }
+  .styled-table td strong { color:var(--text-dark); }
+
+  /* PILL */
+  .pill { display:inline-block; background:var(--teal-pale); color:var(--teal); border-radius:20px; padding:3px 12px; font-size:0.74rem; font-weight:600; }
+
+  /* SHAP BARS */
+  .shap-row { display:flex; align-items:center; gap:10px; margin-bottom:5px; }
+  .shap-label { width:200px; font-size:0.73rem; color:var(--text-mid); text-align:right; flex-shrink:0; line-height:1.3; }
+  .shap-bar-wrap { flex:1; height:14px; background:var(--border); border-radius:4px; overflow:hidden; }
+  .shap-bar { height:100%; border-radius:4px; background:linear-gradient(90deg, var(--teal), var(--teal-light)); }
+  .shap-bar.gold-bar { background:linear-gradient(90deg, var(--gold), var(--gold-light)); }
+
+  /* ICON BADGE */
+  .icon-badge { width:36px; height:36px; border-radius:50%; background:var(--teal-pale); display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
+
+  /* ROC */
+  .roc-visual { background:white; border:1px solid var(--border); border-radius:10px; padding:14px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .roc-label { font-size:0.68rem; color:var(--text-light); text-transform:uppercase; letter-spacing:1px; margin-bottom:5px; text-align:center; }
+  .roc-value { font-family:'Playfair Display',serif; font-size:1.9rem; color:var(--teal); }
+  .roc-sub { font-size:0.7rem; color:var(--text-light); text-align:center; }
+
+  /* FULL HIGHLIGHT */
+  .full-highlight { background:linear-gradient(135deg, var(--teal) 0%, #0E4550 100%); border-radius:12px; padding:18px 22px; color:white; display:flex; gap:16px; align-items:flex-start; }
+  .full-highlight .fh-icon { font-size:1.8rem; flex-shrink:0; }
+  .full-highlight .fh-title { font-family:'Playfair Display',serif; font-size:1rem; margin-bottom:5px; }
+  .full-highlight .fh-text { font-size:0.82rem; opacity:0.9; line-height:1.55; }
+
+  /* VARIABLE BOX */
+  .variable-box { background:white; border:1px solid var(--border); border-radius:10px; padding:14px 18px; display:flex; flex-direction:column; gap:8px; }
+  .var-label { font-size:0.67rem; font-weight:600; letter-spacing:2px; text-transform:uppercase; color:var(--teal); border-bottom:1px solid var(--teal-pale); padding-bottom:5px; margin-bottom:2px; }
+
+  /* SLIDE 1 TITLE LAYOUT */
+  #slide-1 { background:var(--warm-white); justify-content:center; align-items:stretch; flex-direction:row; }
+  #slide-1::before { width:50%; height:100%; background:linear-gradient(160deg, var(--teal) 0%, #0E4550 100%); border-radius:0; }
+  #slide-1::after { display:none; }
+  .title-left { position:relative; z-index:2; width:48%; display:flex; flex-direction:column; justify-content:center; padding:48px 44px 48px 56px; color:white; }
+  .title-left .journal-tag { font-size:0.68rem; letter-spacing:2.5px; text-transform:uppercase; opacity:0.7; margin-bottom:18px; }
+  .title-left h1 { font-family:'Playfair Display',serif; font-size:1.7rem; line-height:1.3; margin-bottom:18px; font-weight:700; }
+  .title-left h1 em { font-style:italic; color:var(--gold-light); }
+  .title-left .authors { font-size:0.78rem; opacity:0.8; line-height:1.7; margin-bottom:22px; }
+  .title-left .meta { display:flex; gap:10px; flex-wrap:wrap; }
+  .title-right { flex:1; display:flex; flex-direction:column; justify-content:center; padding:48px 56px 48px 44px; gap:16px; }
+  .stat-block { display:flex; align-items:center; gap:14px; background:white; border:1px solid var(--border); border-radius:10px; padding:15px 18px; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
+  .stat-block .sb-icon { font-size:1.7rem; flex-shrink:0; }
+  .stat-block .sb-text .sb-val { font-family:'Playfair Display',serif; font-size:1.35rem; color:var(--teal); display:block; }
+  .stat-block .sb-text .sb-lab { font-size:0.73rem; color:var(--text-light); text-transform:uppercase; letter-spacing:1px; }
+
+  /* NAVIGATION */
+  .nav { position:fixed; bottom:18px; right:28px; z-index:100; display:flex; align-items:center; gap:10px; }
+  .nav button {
+    width:32px; height:32px; border-radius:50%;
+    border:1.5px solid rgba(44,62,80,0.2);
+    background:rgba(255,255,255,0.82); backdrop-filter:blur(4px);
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+    color:var(--slate); font-size:14px; transition:all 0.2s;
+  }
+  .nav button:hover { background:var(--teal); border-color:var(--teal); color:white; }
+  .nav .slide-count { font-size:11px; color:rgba(44,62,80,0.45); font-weight:500; min-width:38px; text-align:center; }
+
+  /* PROGRESS */
+  .progress { position:fixed; bottom:0; left:0; height:2px; background:linear-gradient(90deg,var(--teal),var(--teal-light)); transition:width 0.4s ease; z-index:100; }
+
+  /* ANIMATIONS */
+  .slide.active .slide-body > * { animation:fadeUp 0.38s ease both; }
+  .slide.active .slide-body > *:nth-child(2) { animation-delay:0.06s; }
+  .slide.active .slide-body > *:nth-child(3) { animation-delay:0.12s; }
+  .slide.active .slide-body > *:nth-child(4) { animation-delay:0.18s; }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- ═══════════════════════════════════
+     S1 — TÍTULO
+═══════════════════════════════════ -->
+<div class="slide active" id="slide-1">
+  <div class="title-left">
+    <div class="journal-tag">JMIR Public Health &amp; Surveillance · 2023</div>
+    <h1>Predicción de <em>Conductas Suicidas</em> en Población de Mediana Edad</h1>
+    <div class="authors">
+      Wang J, Qiu J, Zhu T, Zeng Y, Yang H, Shang Y,<br>
+      Yin J, Sun Y, Qu Y, Valdimarsdóttir UA, Song H<br>
+      <span style="opacity:0.6;font-size:0.7rem">West China Hospital · Sichuan University · Islandia · Karolinska · Harvard</span>
+    </div>
+    <div class="meta">
+      <span class="pill" style="background:rgba(255,255,255,0.15);color:white">Machine Learning</span>
+      <span class="pill" style="background:rgba(255,255,255,0.15);color:white">UK Biobank</span>
+      <span class="pill" style="background:rgba(255,255,255,0.15);color:white">Cohorte Prospectiva</span>
+    </div>
+  </div>
+  <div class="title-right">
+    <div class="stat-block">
+      <div class="sb-icon">👥</div>
+      <div class="sb-text"><span class="sb-val">502,507</span><span class="sb-lab">participantes UK Biobank</span></div>
+    </div>
+    <div class="stat-block">
+      <div class="sb-icon">📅</div>
+      <div class="sb-text"><span class="sb-val">2006 – 2016</span><span class="sb-lab">periodo de reclutamiento y seguimiento</span></div>
+    </div>
+    <div class="stat-block">
+      <div class="sb-icon">🤖</div>
+      <div class="sb-text"><span class="sb-val">LightGBM + SHAP</span><span class="sb-lab">algoritmo de predicción e interpretación</span></div>
+    </div>
+    <div class="stat-block">
+      <div class="sb-icon">🎯</div>
+      <div class="sb-text"><span class="sb-val">AUROC 0.919</span><span class="sb-lab">rendimiento del modelo a 1 año</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     S2 — DISEÑO Y POBLACIÓN
+═══════════════════════════════════ -->
+<div class="slide" id="slide-2">
+  <div class="slide-header">
+    <span class="num">02</span><div class="bar-line"></div>
+    <span class="tag">Diseño del Estudio</span>
+  </div>
+  <div class="slide-body">
+    <h2 class="section-title">Tipo, lugar y población</h2>
+    <div class="card-grid cols-3" style="flex:1">
+      <div class="card accent-teal">
+        <div class="card-label">🔬 Tipo de estudio</div>
+        <div class="card-value" style="font-size:1.15rem">Cohorte Prospectiva</div>
+        <div class="card-desc">Seguimiento de UK Biobank (reclutada 2006–2010). Desenlaces capturados durante 1 a 6 años tras el baseline mediante registros nacionales enlazados.</div>
+      </div>
+      <div class="card accent-gold">
+        <div class="card-label">📍 Lugar</div>
+        <div class="card-value" style="font-size:1.1rem">Reino Unido</div>
+        <div class="card-desc">Centros de evaluación en <strong>Inglaterra, Escocia y Gales</strong>. Datos enlazados al NHS, registros hospitalarios y mortalidad nacional.</div>
+      </div>
+      <div class="card accent-slate">
+        <div class="card-label">👤 Población analítica</div>
+        <div class="card-value" style="font-size:1.1rem">376,878 participantes</div>
+        <div class="card-desc">Adultos de <strong>40–69 años</strong>, ascendencia blanca, con datos genómicos válidos. Edad media: 56.7 años, distribución equitativa por sexo.</div>
+      </div>
+    </div>
+    <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="background:var(--teal-pale);border-radius:10px;padding:13px 18px">
+        <div class="card-label" style="color:var(--teal);margin-bottom:6px">Corto plazo (≤ 1 año)</div>
+        <div style="font-size:0.85rem;color:var(--text-mid)"><strong>223 casos</strong> de intento o muerte · <strong>4,460 controles</strong> · Ratio 1:20</div>
+      </div>
+      <div style="background:#FBF0D8;border-radius:10px;padding:13px 18px">
+        <div class="card-label" style="color:var(--gold);margin-bottom:6px">Largo plazo (1–6 años)</div>
+        <div style="font-size:0.85rem;color:var(--text-mid)"><strong>833 casos</strong> de intento o muerte · <strong>16,660 controles</strong> · Ratio 1:20</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     S3 — CRITERIOS DE SELECCIÓN Y ESTADÍSTICA
+═══════════════════════════════════ -->
+<div class="slide" id="slide-3">
+  <div class="slide-header">
+    <span class="num">03</span><div class="bar-line"></div>
+    <span class="tag">Diseño del Estudio</span>
+  </div>
+  <div class="slide-body">
+    <h2 class="section-title">Selección de participantes y análisis estadístico</h2>
+    <div class="two-col">
+      <div class="col">
+        <div class="card accent-teal" style="flex:1">
+          <div class="card-label">✅ Criterios de Inclusión</div>
+          <ul class="bullet-list" style="margin-top:6px">
+            <li>Participante activo del UK Biobank (40–69 años)</li>
+            <li>Ascendencia blanca con genotipado de calidad</li>
+            <li>Consentimiento vigente al inicio del seguimiento</li>
+            <li>Datos con &lt;15% de valores faltantes por variable</li>
+          </ul>
+        </div>
+        <div class="card accent-rose" style="flex:1">
+          <div class="card-label">❌ Criterios de Exclusión</div>
+          <ul class="bullet-list" style="margin-top:6px">
+            <li>Retiro del UK Biobank (n = 48)</li>
+            <li>Ancestría no blanca-europea (n = 92,875)</li>
+            <li>Fallo en control de calidad genético (n = 32,706)</li>
+            <li>Variables con &gt;15% datos faltantes o irrelevantes</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card accent-gold" style="flex:1">
+          <div class="card-label">📊 Análisis Estadístico</div>
+          <ul class="bullet-list" style="margin-top:6px">
+            <li><strong>LightGBM con bagging balanceado</strong> (1000 clasificadores)</li>
+            <li>Validación cruzada estratificada 10-fold</li>
+            <li>Grid-search para hiperparámetros óptimos</li>
+            <li>SHAP para cuantificar importancia de variables</li>
+            <li>AUROC, sensibilidad, especificidad, VPP y VPN</li>
+            <li>Validación externa en submuestra de repetición (n = 50,310)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     S4 — VARIABLES INDEPENDIENTES
+═══════════════════════════════════ -->
+<div class="slide" id="slide-4">
+  <div class="slide-header">
+    <span class="num">04</span><div class="bar-line"></div>
+    <span class="tag">Variables del Estudio</span>
+  </div>
+  <div class="slide-body">
+    <h2 class="section-title">Variables independientes (predictoras)</h2>
+    <div style="font-size:0.82rem;color:var(--text-mid);margin-bottom:14px">143 variables procesadas → modelo final usa las <strong>top 20 por valor SHAP</strong></div>
+    <div class="card-grid cols-3" style="flex:1">
+      <div class="card accent-teal">
+        <div class="card-label">🧑‍💼 Sociodemográficas</div>
+        <ul class="bullet-list" style="margin-top:4px">
+          <li>Edad</li>
+          <li>Ingresos familiares</li>
+          <li>Estado laboral</li>
+          <li>Tipo de vivienda</li>
+          <li>Años en la dirección actual</li>
+        </ul>
+      </div>
+      <div class="card accent-rose">
+        <div class="card-label">🧠 Salud Mental</div>
+        <ul class="bullet-list" style="margin-top:4px">
+          <li>Historia de trastorno psiquiátrico</li>
+          <li>Intento de suicidio previo</li>
+          <li>Consultas a psiquiatra / médico general</li>
+          <li>Estados de ánimo y neuroticismo</li>
+          <li>Sentimientos de culpa, anhedonia</li>
+        </ul>
+      </div>
+      <div class="card accent-gold">
+        <div class="card-label">🏃 Examen físico y estilo de vida</div>
+        <ul class="bullet-list" style="margin-top:4px">
+          <li>% de grasa corporal e IMC</li>
+          <li>Presión arterial, fuerza de agarre</li>
+          <li>Patrón dietario (prudente / occidental)</li>
+          <li>Horas de sueño</li>
+          <li>Tabaquismo, exposición pasiva</li>
+        </ul>
+      </div>
+    </div>
+    <div style="background:var(--teal-pale);border-radius:10px;padding:11px 18px;margin-top:12px;font-size:0.82rem;color:var(--teal)">
+      🧬 <strong>PRS (Puntaje de Riesgo Poligénico):</strong> calculado pero <em>no incluido</em> en los modelos de predicción. Solo se usó para validar robustez en subgrupos genéticos.
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     S5 — VARIABLE DEPENDIENTE
+═══════════════════════════════════ -->
+<div class="slide" id="slide-5">
+  <div class="slide-header">
+    <span class="num">05</span><div class="bar-line"></div>
+    <span class="tag">Variables del Estudio</span>
+  </div>
+  <div class="slide-body">
+    <h2 class="section-title">Variable dependiente (desenlace)</h2>
+    <div class="two-col" style="align-items:start">
+      <div class="col">
+        <div class="variable-box" style="flex:0">
+          <div class="var-label" style="color:var(--rose)">Conducta Suicida — Definición operativa</div>
+          <ul class="bullet-list">
+            <li><strong>Intento de suicidio:</strong> hospitalización con diagnóstico de autolesión intencional (CIE-10: X60–84) o daño de intención indeterminada (Y10–34)</li>
+            <li><strong>Muerte por suicidio:</strong> causa registrada en el registro nacional de mortalidad (CIE-10: X60–84, Y10–34 / CIE-9: E950–958)</li>
+          </ul>
+        </div>
+        <div class="card accent-rose" style="flex:0">
+          <div class="card-label">⚠️ Limitación de la definición</div>
+          <div class="card-desc">Solo se capturan intentos que llegan a hospitalización. Intentos leves, atendidos en urgencias sin ingreso o no consultados, quedan fuera del registro.</div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card-label" style="margin-bottom:10px;font-size:0.7rem;letter-spacing:1.5px;color:var(--text-light)">DOS HORIZONTES TEMPORALES</div>
+        <div style="background:var(--teal-pale);border-radius:12px;padding:20px 22px;margin-bottom:10px">
+          <div style="font-size:0.68rem;color:var(--teal);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px">Corto plazo</div>
+          <div style="font-family:'Playfair Display',serif;font-size:2rem;color:var(--teal);line-height:1">≤ 1 año</div>
+          <div style="font-size:0.83rem;color:var(--text-mid);margin-top:6px">223 casos · 4,460 controles</div>
+        </div>
+        <div style="background:#FBF0D8;border-radius:12px;padding:20px 22px">
+          <div style="font-size:0.68rem;color:var(--gold);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px">Largo plazo</div>
+          <div style="font-family:'Playfair Display',serif;font-size:2rem;color:var(--gold);line-height:1">1 – 6 años</div>
+          <div style="font-size:0.83rem;color:var(--text-mid);margin-top:6px">833 casos · 16,660 controles</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     S6 — TABLA 1: CARACTERÍSTICAS BASALES
+═══════════════════════════════════ -->
+<div class="slide" id="slide-6">
+  <div class="slide-header">
+    <span class="num">06</span><div class="bar-line"></div>
+    <span class="tag">Resultados · Tabla 1</span>
+  </div>
+  <div class="slide-body">
+    <h2 class="section-title">Características basales de la muestra</h2>
+    <table class="styled-table">
+      <thead>
+        <tr>
+          <th>Característica</th>
+          <th>Corto plazo (≤1 año)<br><small style="opacity:0.8">n = 4,683</small></th>
+          <th>Largo plazo (1–6 años)<br><small style="opacity:0.8">n = 17,493</small></th>
+          <th>Validación externa<br><small style="opacity:0.8">n = 50,310</small></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Edad media (DE)</strong></td><td>56.75 (8.03)</td><td>56.65 (7.99)</td><td>63.24 (7.49)</td></tr>
+        <tr><td><strong>Sexo femenino</strong></td><td>53%</td><td>54.5%</td><td>51%</td></tr>
+        <tr><td><strong>Historia psiquiátrica</strong></td><td>19.7%</td><td>17.8%</td><td>22%</td></tr>
+        <tr><td><strong>Intento previo de suicidio</strong></td><td>2.3%</td><td>1.3%</td><td>0.4%</td></tr>
+        <tr><td><strong>Consulta psiquiátrica previa</strong></td><td>14.1%</td><td>12.9%</td><td>9.1%</td></tr>
+        <tr><td><strong>Ingresos &lt;£18,000</strong></td><td>20.2%</td><td>19.5%</td><td>12.9%</td></tr>
+        <tr><td><strong>Casos (n)</strong></td><td>223</td><td>833</td><td>12 / 31</td></tr>
+      </tbody>
+    </table>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px">
+      <div class="card accent-teal" style="padding:12px 16px">
+        <div class="card-label">Diseño del muestreo</div>
+        <div class="card-desc">Relación caso:control de <strong>1:20</strong> por selección aleatoria. Permite manejar el marcado desbalance de clases en un evento tan infrecuente.</div>
+      </div>
+      <div class="card accent-gold" style="padding:12px 16px">
+        <div class="card-label">Diferencia en la validación externa</div>
+        <div class="card-desc">Muestra de repetición es <strong>6 años mayor</strong> y con mayor historia psiquiátrica (22%). Esto hace la validación más exigente y representativa.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     S7 — RENDIMIENTO DE LOS MODELOS
+═══════════════════════════════════ -->
+<div class="slide" id="slide-7">
+  <div class="slide-header">
+    <span class="num">07</span><div class="bar-line"></div>
+    <span class="tag">Resultados · Figura 2 — Rendimiento</span>
+  </div>
+  <div class="slide-body">
+    <h2 class="section-title">Curvas ROC y métricas de rendimiento</h2>
+    <div class="two-col">
+      <div class="col">
+        <div style="font-family:'Playfair Display',serif;font-size:0.95rem;color:var(--slate);border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:8px">Modelo completo · 143 variables</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div class="roc-visual"><div class="roc-label">AUROC ≤ 1 año</div><div class="roc-value">0.919</div><div class="roc-sub">IC95%: 0.852–0.985</div></div>
+          <div class="roc-visual"><div class="roc-label">AUROC 1–6 años</div><div class="roc-value">0.892</div><div class="roc-sub">IC95%: 0.844–0.940</div></div>
+        </div>
+        <table class="styled-table" style="font-size:0.75rem">
+          <thead><tr><th>Umbral</th><th>Sens.</th><th>Esp.</th><th>VPP</th><th>VPN</th></tr></thead>
+          <tbody>
+            <tr><td>0.50</td><td>78.9%</td><td>88.9%</td><td>22.1%</td><td>98.8%</td></tr>
+            <tr><td>0.65</td><td>61.9%</td><td>93.6%</td><td>30.4%</td><td>98.2%</td></tr>
+            <tr><td>0.70</td><td>57.8%</td><td>95.1%</td><td>37.2%</td><td>97.8%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="col">
+        <div style="font-family:'Playfair Display',serif;font-size:0.95rem;color:var(--teal);border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:8px">Modelo aplicable · Top 20 variables</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div class="roc-visual" style="border-color:var(--teal)"><div class="roc-label">AUROC ≤ 1 año</div><div class="roc-value">0.901</div><div class="roc-sub">IC95%: 0.821–0.981</div></div>
+          <div class="roc-visual" style="border-color:var(--teal)"><div class="roc-label">AUROC 1–6 años</div><div class="roc-value">0.885</div><div class="roc-sub">IC95%: 0.834–0.936</div></div>
+        </div>
+        <div class="full-highlight" style="padding:14px 18px">
+          <div class="fh-icon">🎯</div>
+          <div>
+            <div class="fh-title">Hallazgo clave</div>
+            <div class="fh-text">El quintil de <strong>mayor riesgo predicho</strong> concentra el <strong>91.7%</strong> de casos a 1 año y el <strong>80.7%</strong> a 1–6 años. Solo 20 variables.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     S8 — SHAP: VARIABLES MÁS IMPORTANTES
+═══════════════════════════════════ -->
+<div class="slide" id="slide-8">
+  <div class="slide-header">
+    <span class="num">08</span><div class="bar-line"></div>
+    <span class="tag">Resultados · Figura 3 — Importancia SHAP</span>
+  </div>
+  <div class="slide-body">
+    <h2 class="section-title">Top predictores por valores SHAP</h2>
+    <div class="two-col">
+      <div class="col">
+        <div class="card-label" style="color:var(--teal);margin-bottom:8px;font-size:0.68rem;letter-spacing:2px">▐ CORTO PLAZO (≤ 1 año)</div>
+        <div class="shap-row"><div class="shap-label">Historia psiquiátrica</div><div class="shap-bar-wrap"><div class="shap-bar" style="width:95%"></div></div></div>
+        <div class="shap-row"><div class="shap-label">Consulta a psiquiatra</div><div class="shap-bar-wrap"><div class="shap-bar" style="width:87%"></div></div></div>
+        <div class="shap-row"><div class="shap-label">Ánimo deprimido (2 sem.)</div><div class="shap-bar-wrap"><div class="shap-bar" style="width:81%"></div></div></div>
+        <div class="shap-row"><div class="shap-label">Edad</div><div class="shap-bar-wrap"><div class="shap-bar" style="width:76%"></div></div></div>
+        <div class="shap-row"><div class="shap-label">Intento suicida previo</div><div class="shap-bar-wrap"><div class="shap-bar" style="width:70%"></div></div></div>
+        <div class="shap-row"><div class="shap-label">Consulta al médico gral.</div><div class="shap-bar-wrap"><div class="shap-bar" style="width:65%"></div></div></div>
+        <div class="shap-row"><div class="shap-label">% Grasa corporal</div><div class="shap-bar-wrap"><div class="shap-bar" style="width:58%"></div></div></div>
+        <div class="shap-row"><div class="shap-label">Ingresos familiares</div><div class="shap-bar-wrap"><div class="shap-bar" style="width:52%"></div></div></div>
+        <div class="shap-row"><div class="shap-label">Uso del móvil (años)</div><div class="shap-bar-wrap"><div class="shap-bar" style="width:44%"></div></div></div>
+      </div>
+      <div class="col">
+        <div class="card-label" style="color:var(--gold);margin-bottom:8px;font-size:0.68rem;letter-spacing:2px">▐ LARGO PLAZO (1–6 años)</div>
+        <div class="shap-row"><div class="shap-label">Historia psiquiátrica</div><div class="shap-bar-wrap"><div class="shap-bar gold-bar" style="width:95%"></div></div></div>
+        <div class="shap-row"><div class="shap-label">Consulta a psiquiatra</div><div class="shap-bar-wrap"><div class="shap-bar gold-bar" style="width:86%"></div></div></div>
+        <div class="shap-row"><div class="shap-label">Edad</div><div class="shap-bar-wrap"><div class="shap-bar gold-bar" style="width:80%"></div></div></div>
+        <div class="shap-row"><div class="shap-label">Consulta al médico gral.</div><div class="shap-bar-wrap"><div class="shap-bar gold-bar" style="width:74%"></div></div></div>
+        <div class="shap-row"><div class="shap-label">Autoevaluación de salud</div><div class="shap-bar-wrap"><div class="shap-bar gold-bar" style="width:68%"></div></div></div>
+        <div class="shap-row"><div class="shap-label">Intento suicida previo</div><div class="shap-bar-wrap"><div class="shap-bar gold-bar" style="width:62%"></div></div></div>
+        <div class="shap-row"><div class="shap-label">% Grasa corporal</div><div class="shap-bar-wrap"><div class="shap-bar gold-bar" style="width:57%"></div></div></div>
+        <div class="shap-row"><div class="shap-label">Cambio de peso</div><div class="shap-bar-wrap"><div class="shap-bar gold-bar" style="width:48%"></div></div></div>
+        <div class="shap-row"><div class="shap-label">Estado laboral</div><div class="shap-bar-wrap"><div class="shap-bar gold-bar" style="width:42%"></div></div></div>
+        <div style="background:var(--teal-pale);border-radius:8px;padding:9px 13px;margin-top:6px;font-size:0.77rem;color:var(--teal)">
+          ⚡ El <strong>contacto social y uso del móvil</strong> destacan en el corto plazo; la <strong>autoevaluación de salud</strong> es más relevante a largo plazo.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     S9 — VALIDACIÓN GENÉTICA
+═══════════════════════════════════ -->
+<div class="slide" id="slide-9">
+  <div class="slide-header">
+    <span class="num">09</span><div class="bar-line"></div>
+    <span class="tag">Resultados · Validación por PRS</span>
+  </div>
+  <div class="slide-body">
+    <h2 class="section-title">Rendimiento según susceptibilidad genética al suicidio</h2>
+    <div class="card-grid cols-2" style="margin-bottom:14px">
+      <div class="card accent-teal">
+        <div class="card-label">≤ 1 año · Alta susceptibilidad genética (PRS &gt; tertil 2)</div>
+        <div class="card-value large">0.907</div>
+        <div class="card-desc">AUROC del modelo de 20 variables en el subgrupo de mayor carga genética.</div>
+      </div>
+      <div class="card accent-gold">
+        <div class="card-label">≤ 1 año · Baja susceptibilidad genética (PRS &lt; tertil 1)</div>
+        <div class="card-value large" style="color:var(--gold)">0.885</div>
+        <div class="card-desc">Rendimiento comparable. La diferencia entre grupos es mínima.</div>
+      </div>
+      <div class="card accent-teal">
+        <div class="card-label">1–6 años · Alta susceptibilidad genética</div>
+        <div class="card-value large">0.869</div>
+        <div class="card-desc">El modelo mantiene alta precisión también en el horizonte largo.</div>
+      </div>
+      <div class="card accent-gold">
+        <div class="card-label">1–6 años · Baja susceptibilidad genética</div>
+        <div class="card-value large" style="color:var(--gold)">0.822</div>
+        <div class="card-desc">Robusto incluso sin el PRS como predictor en el modelo.</div>
+      </div>
+    </div>
+    <div class="full-highlight">
+      <div class="fh-icon">🧬</div>
+      <div>
+        <div class="fh-title">Mensaje sobre el PRS</div>
+        <div class="fh-text">El PRS no fue incluido como predictor (difícil de obtener en la práctica). Fue usado solo para <strong>validar robustez</strong>: el modelo funciona bien sin genotipado, lo que lo hace aplicable a poblaciones generales.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     S10 — CONCLUSIÓN
+═══════════════════════════════════ -->
+<div class="slide" id="slide-10">
+  <div class="slide-header">
+    <span class="num">10</span><div class="bar-line"></div>
+    <span class="tag">Conclusión</span>
+  </div>
+  <div class="slide-body">
+    <h2 class="section-title">¿Qué concluyen los autores? ¿Estamos de acuerdo?</h2>
+    <div class="two-col">
+      <div class="col">
+        <div style="background:linear-gradient(135deg,#FBF8F2,white);border:1px solid var(--gold);border-radius:12px;padding:18px 22px;flex:1;display:flex;flex-direction:column;gap:9px">
+          <div style="font-family:'Playfair Display',serif;font-size:1rem;color:var(--gold);margin-bottom:4px">Conclusión de los autores</div>
+          <ul class="bullet-list">
+            <li>Modelos de ML con solo <strong>20 variables fenotípicas</strong> alcanzan AUROC 0.885–0.919</li>
+            <li>El <strong>20% de mayor riesgo</strong> predicho concentra &gt;80% de los casos reales</li>
+            <li>Funciona bien en todos los perfiles de susceptibilidad genética</li>
+            <li>Es un método <strong>costo-efectivo</strong> para tamización poblacional</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card accent-teal">
+          <div class="card-label">✅ Puntos de acuerdo</div>
+          <ul class="bullet-list" style="margin-top:4px">
+            <li>Reducción de 2,978 a 20 variables: avance real y práctico</li>
+            <li>SHAP aporta interpretabilidad clínica genuina</li>
+            <li>Validación en muestra demográficamente distinta: metodológicamente sólida</li>
+          </ul>
+        </div>
+        <div class="card accent-rose">
+          <div class="card-label">⚠️ Matices críticos</div>
+          <ul class="bullet-list" style="margin-top:4px">
+            <li>Muestra exclusivamente blanca-europea → baja generalización</li>
+            <li>Solo 5.5% del universo invitado participó → sesgo de selección</li>
+            <li>AUROC alto no garantiza VPP suficiente en prevalencia baja</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     S11 — VENTAJAS
+═══════════════════════════════════ -->
+<div class="slide" id="slide-11">
+  <div class="slide-header">
+    <span class="num">11</span><div class="bar-line"></div>
+    <span class="tag">Análisis Crítico — Ventajas</span>
+  </div>
+  <div class="slide-body">
+    <h2 class="section-title">3 Ventajas de este tipo de estudio</h2>
+    <div class="card-grid cols-3" style="flex:1">
+      <div class="card accent-teal">
+        <div style="font-size:2rem;margin-bottom:6px">⏱️</div>
+        <div class="card-label">1 · Temporalidad causal clara</div>
+        <div class="card-desc">El diseño prospectivo garantiza que todos los predictores preceden al desenlace. Esto permite una inferencia temporal más robusta que los diseños transversales o de casos y controles.</div>
+      </div>
+      <div class="card accent-teal">
+        <div style="font-size:2rem;margin-bottom:6px">📏</div>
+        <div class="card-label">2 · Gran muestra y datos ricos</div>
+        <div class="card-desc">Más de 500,000 participantes con datos genómicos, de estilo de vida y registros clínicos enlazados. Esto reduce el error aleatorio y permite entrenar modelos de ML complejos con alta precisión.</div>
+      </div>
+      <div class="card accent-teal">
+        <div style="font-size:2rem;margin-bottom:6px">🔍</div>
+        <div class="card-label">3 · Aplicabilidad clínica real</div>
+        <div class="card-desc">La reducción a 20 variables hace el modelo viable en entornos reales sin infraestructura genómica. Las variables clave son obtenibles en una consulta de atención primaria rutinaria.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     S12 — DESVENTAJAS
+═══════════════════════════════════ -->
+<div class="slide" id="slide-12">
+  <div class="slide-header">
+    <span class="num">12</span><div class="bar-line"></div>
+    <span class="tag">Análisis Crítico — Desventajas</span>
+  </div>
+  <div class="slide-body">
+    <h2 class="section-title">3 Desventajas de este tipo de estudio</h2>
+    <div class="card-grid cols-3" style="flex:1">
+      <div class="card accent-rose">
+        <div style="font-size:2rem;margin-bottom:6px">🌍</div>
+        <div class="card-label">1 · Generalización limitada</div>
+        <div class="card-desc">Muestra exclusivamente blanca y europea, de mediana edad, del UK. Los resultados no son extrapolables directamente a otras etnias, grupos de edad o sistemas de salud sin reentrenamiento del modelo.</div>
+      </div>
+      <div class="card accent-rose">
+        <div style="font-size:2rem;margin-bottom:6px">🏥</div>
+        <div class="card-label">2 · Captura incompleta del desenlace</div>
+        <div class="card-desc">Solo se detectan intentos que requieren hospitalización. Los intentos leves, atendidos ambulatoriamente o no consultados, quedan fuera, subestimando los casos reales y sesgando el modelo.</div>
+      </div>
+      <div class="card accent-rose">
+        <div style="font-size:2rem;margin-bottom:6px">🎛️</div>
+        <div class="card-label">3 · Sesgo de selección y caja gris</div>
+        <div class="card-desc">Solo el 5.5% de los invitados participó, sesgando hacia individuos más saludables. Además, aunque SHAP ayuda, la interpretación clínica profunda de las interacciones entre variables sigue siendo limitada.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     S13 — ¿EN NUESTRO MEDIO?
+═══════════════════════════════════ -->
+<div class="slide" id="slide-13">
+  <div class="slide-header">
+    <span class="num">13</span><div class="bar-line"></div>
+    <span class="tag">Contexto Local</span>
+  </div>
+  <div class="slide-body">
+    <h2 class="section-title">¿Podría hacerse un estudio similar en Colombia?</h2>
+    <div class="two-col">
+      <div class="col">
+        <div class="highlight-box" style="padding:16px 20px;margin-bottom:10px">
+          <div class="hb-label">Veredicto</div>
+          <div class="hb-value" style="font-size:1.35rem">Sí · Con adaptaciones importantes</div>
+          <div class="hb-desc">Los componentes básicos existen. La brecha está en la escala y calidad de los datos.</div>
+        </div>
+        <div class="card accent-teal">
+          <div class="card-label">✅ A favor</div>
+          <ul class="bullet-list" style="margin-top:4px">
+            <li>SIVIGILA registra intentos de suicidio desde 2016</li>
+            <li>RIPS contiene hospitalizaciones con diagnóstico CIE-10</li>
+            <li>Las 20 variables clave son obtenibles sin genotipado</li>
+            <li>Historia clínica electrónica (HCE) y SISBEN tienen datos sociodemográficos</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card accent-rose">
+          <div class="card-label">⚠️ Desafíos</div>
+          <ul class="bullet-list" style="margin-top:4px">
+            <li>Alto subregistro en zonas rurales sin acceso a urgencias</li>
+            <li>Diversidad étnica requiere modelos estratificados (afro, indígena, mestizo)</li>
+            <li>No hay datos genéticos comunitarios: el PRS no es calculable</li>
+            <li>No existe un equivalente nacional al UK Biobank</li>
+          </ul>
+        </div>
+        <div style="background:var(--teal-pale);border-radius:10px;padding:13px 16px;margin-top:2px">
+          <div style="font-size:0.82rem;color:var(--teal)">💡 <strong>Propuesta más viable:</strong> cohorte retrospectiva con datos RIPS + SIVIGILA + ENSM, aplicando LightGBM con variables sociodemográficas y clínicas disponibles en registros colombianos.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     S14 — DISEÑOS ALTERNATIVOS
+═══════════════════════════════════ -->
+<div class="slide" id="slide-14">
+  <div class="slide-header">
+    <span class="num">14</span><div class="bar-line"></div>
+    <span class="tag">Diseños Alternativos</span>
+  </div>
+  <div class="slide-body">
+    <h2 class="section-title">¿Puede abordarse como otros diseños?</h2>
+    <div class="card-grid cols-2" style="flex:1">
+      <div class="card accent-gold">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+          <div class="icon-badge" style="background:#FBF0D8">🔄</div>
+          <div class="card-label">Casos y Controles</div>
+        </div>
+        <ul class="bullet-list">
+          <li><strong>Cómo:</strong> casos = hospitalizados por intento; controles = sin evento, emparejados por edad y sexo. Se exploran exposiciones pasadas.</li>
+          <li><strong>Ventaja:</strong> eficiente para eventos raros.</li>
+          <li><strong>Limitación:</strong> no establece temporalidad; sesgo de recuerdo.</li>
+        </ul>
+      </div>
+      <div class="card accent-slate">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+          <div class="icon-badge" style="background:#EEF0F3">📸</div>
+          <div class="card-label">Transversal</div>
+        </div>
+        <ul class="bullet-list">
+          <li><strong>Cómo:</strong> medir ideación suicida activa y exposición en un único momento, en encuesta o urgencias.</li>
+          <li><strong>Ventaja:</strong> rápido y económico; útil para prevalencia.</li>
+          <li><strong>Limitación:</strong> no permite inferencia causal ni predicción futura.</li>
+        </ul>
+      </div>
+      <div class="card accent-teal">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+          <div class="icon-badge">➡️</div>
+          <div class="card-label">Cohorte (diseño original)</div>
+        </div>
+        <ul class="bullet-list">
+          <li><strong>Cómo:</strong> seguir individuos sin el desenlace y observar quiénes lo desarrollan. Ya realizado con UK Biobank.</li>
+          <li><strong>Ventaja:</strong> calcula incidencia y permite ML prospectivo.</li>
+          <li><strong>Limitación:</strong> costoso y requiere muestra muy grande.</li>
+        </ul>
+      </div>
+      <div class="card accent-rose">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+          <div class="icon-badge" style="background:#F8E8E8">🧪</div>
+          <div class="card-label">Experimental (Ensayo Clínico)</div>
+        </div>
+        <ul class="bullet-list">
+          <li><strong>Cómo:</strong> usar el modelo para identificar alto riesgo y asignar aleatoriamente intervención preventiva vs. atención estándar.</li>
+          <li><strong>Ventaja:</strong> evalúa el impacto real del modelo en vidas.</li>
+          <li><strong>Limitación:</strong> complejo éticamente y logísticamente.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     S15 — CIERRE
+═══════════════════════════════════ -->
+<div class="slide" id="slide-15">
+  <div class="slide-header">
+    <span class="num">15</span><div class="bar-line"></div>
+    <span class="tag">Mensaje Final</span>
+  </div>
+  <div class="slide-body" style="justify-content:center;align-items:center">
+    <div style="max-width:820px;display:flex;flex-direction:column;gap:22px;align-items:center;text-align:center">
+      <div style="font-family:'Playfair Display',serif;font-size:2rem;color:var(--slate);line-height:1.3">
+        Con solo 20 preguntas clínicas es posible identificar al <em style="color:var(--teal)">80–92%</em> de los pacientes en riesgo de conducta suicida
+      </div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center">
+        <div class="card" style="width:190px;text-align:center;align-items:center;border-top:3px solid var(--teal)">
+          <div style="font-size:1.7rem">🎯</div>
+          <div class="card-label">Precisión</div>
+          <div class="card-value" style="font-size:1.35rem">AUROC 0.919</div>
+        </div>
+        <div class="card" style="width:190px;text-align:center;align-items:center;border-top:3px solid var(--gold)">
+          <div style="font-size:1.7rem">📋</div>
+          <div class="card-label">Variables</div>
+          <div class="card-value" style="font-size:1.35rem">Solo 20</div>
+        </div>
+        <div class="card" style="width:190px;text-align:center;align-items:center;border-top:3px solid var(--rose)">
+          <div style="font-size:1.7rem">👥</div>
+          <div class="card-label">Muestra</div>
+          <div class="card-value" style="font-size:1.35rem">&gt;500K</div>
+        </div>
+      </div>
+      <div style="background:var(--teal-pale);border-radius:12px;padding:13px 24px;max-width:660px">
+        <div style="font-size:0.82rem;color:var(--teal)">📚 <strong>Wang et al.</strong> Prediction of Suicidal Behaviors in the Middle-aged Population. <em>JMIR Public Health Surveill</em> 2023;9:e43419. doi: 10.2196/43419</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- end deck -->
+
+<!-- NAVIGATION -->
+<div class="nav">
+  <button onclick="changeSlide(-1)">&#8249;</button>
+  <span class="slide-count" id="slide-count">1 / 15</span>
+  <button onclick="changeSlide(1)">&#8250;</button>
+</div>
+<div class="progress" id="progress"></div>
+
+<script>
+  const total = 15;
+  let current = 1;
+
+  function showSlide(n) {
+    document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+    document.getElementById('slide-' + n).classList.add('active');
+    document.getElementById('slide-count').textContent = n + ' / ' + total;
+    document.getElementById('progress').style.width = (n / total * 100) + '%';
+    current = n;
+  }
+
+  function changeSlide(dir) {
+    let next = current + dir;
+    if (next < 1) next = total;
+    if (next > total) next = 1;
+    showSlide(next);
+  }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') changeSlide(1);
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') changeSlide(-1);
+  });
+
+  showSlide(1);
+</script>
+</body>
+</html>
